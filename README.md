@@ -4,7 +4,7 @@
 Манифест для ИИ-агента: https://TerryAirwalker.github.io/datasapience-brandbook/manifest.json
 
 ## Структура
-- `logos/svg/`, `logos/png/` — логотип DS (полный/знак/текст, ч/б)
+- `logos/svg/` — логотип DS (full/symbol/text, ч/б); `logos/png/variants/` — 12 PNG: horizontal/stacked/side/symbol × black/blue/white (полный набор версий)
 - `logos/products/` — исходники логотипов продуктов (svg/ai/zip); `logos/products/png/` — готовые превью (cm-ocean, kolmogorov, talys, data-ocean-governance)
 - `fonts/` — Unbounded, Ping LCG
 - `templates/` — Data Sapience template.pptx
