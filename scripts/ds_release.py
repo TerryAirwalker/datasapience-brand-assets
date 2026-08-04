@@ -8,8 +8,17 @@
     python3 ds_release.py 2.7                 # проштамповать + опубликовать + тег
     python3 ds_release.py 2.7 --no-publish     # только локально проставить версию
     python3 ds_release.py 2.7 --date 18.06.2026
+    python3 ds_release.py --files-only brandbook [manifest] [skill]
+        # опубликовать уже отредактированные локальные файлы напрямую, БЕЗ бампа версии
+        # и БЕЗ тега (случай «правок много, но версия не меняется» — см. SKILL.md брендбука,
+        # раздел «Публикация» → «Оставить текущую»).
 
 Источник правды версии — manifest.meta.version. Брендбук показывает v<major> · сборку.
+
+Рабочие файлы (MANIFEST/BRANDBOOK) лежат в приватном репозитории-источнике
+datasapience-brandbook-source, клонированном в /workspace/datasapience-brandbook-source/
+(см. SKILL брендбука, раздел «При запуске») — не в плоском /workspace/, чтобы не терять
+правки между тредами.
 
 ВАЖНО (архитектура managed skills): ~/.claude/skills/datasapience-design/SKILL.md
 физически read-only — Chat App материализует managed-скиллы в сессию только на чтение.
@@ -21,8 +30,9 @@ staging-копию в оба репо через API, но НЕ обновляе
 """
 import sys, os, json, re, base64, urllib.request, urllib.error, time, datetime
 
-MANIFEST  = "/workspace/manifest.json"
-BRANDBOOK = "/workspace/Брендбук Data Sapience v1.html"
+SOURCE_DIR = "/workspace/datasapience-brandbook-source"
+MANIFEST  = f"{SOURCE_DIR}/manifest.json"
+BRANDBOOK = f"{SOURCE_DIR}/Брендбук Data Sapience v1.html"
 SKILL     = "/workspace/datasapience-design/SKILL.md"
 SETTINGS  = "/home/sandbox/.claude/settings.json"
 GH_TOKEN_FILE = "/workspace/.gh_token"  # durable fallback (workspace-диск переживает рестарт рантайма)
@@ -141,6 +151,26 @@ def put_file(token, user, repo, path, local, msg):
         return (st, res)
     return st
 
+FILE_ALIASES = {
+    "brandbook": [("datasapience-brandbook", "index.html", BRANDBOOK)],
+    "manifest":  [("datasapience-brandbook", "manifest.json", MANIFEST)],
+    "skill":     [("datasapience-brandbook", "skill/datasapience-design/SKILL.md", SKILL),
+                  ("datasapience-brand-assets", "skill/datasapience-design/SKILL.md", SKILL)],
+}
+
+def files_only(names):
+    """Публикует уже отредактированные локальные файлы напрямую, без стемпинга версии/тега."""
+    unknown = [n for n in names if n not in FILE_ALIASES]
+    if unknown:
+        sys.exit(f"unknown file alias(es): {unknown} (choices: {list(FILE_ALIASES)})")
+    token, user = gh()
+    for name in names:
+        for repo, path, local in FILE_ALIASES[name]:
+            if not os.path.exists(local):
+                print(f"  skip {name} ({repo}/{path}): {local} not found"); continue
+            msg = f"Update {path} (no version change)"
+            print(f"  publish {repo}/{path}: {put_file(token, user, repo, path, local, msg)}")
+
 def tag_release(token, user, repo, ver):
     st, ref = api("GET", f"https://api.github.com/repos/{user}/{repo}/git/refs/heads/main", token)
     sha = ref.get("object", {}).get("sha")
@@ -154,6 +184,13 @@ def tag_release(token, user, repo, ver):
     return st
 
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] == "--files-only":
+        names = sys.argv[2:]
+        if not names:
+            sys.exit(f"usage: ds_release.py --files-only <name> [<name> ...] (choices: {list(FILE_ALIASES)})")
+        assert TOKEN_OK_GUARD(), "token must not be in SKILL.md"
+        files_only(names)
+        return
     ver, publish, tag, date_disp, iso = parse_args()
     assert TOKEN_OK_GUARD(), "token must not be in SKILL.md"
     print(f"== DS release v{ver} ({date_disp}) ==")
