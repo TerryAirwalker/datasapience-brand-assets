@@ -162,8 +162,19 @@ def embed_fonts(src, dst=None):
     lst = f'<p:embeddedFontLst>{"".join(entries)}</p:embeddedFontLst>'
     if "embedTrueTypeFonts" not in pres:
         pres = pres.replace("<p:presentation ", '<p:presentation embedTrueTypeFonts="1" ', 1)
-    m = re.search(r'</p:sldIdLst>', pres)
-    pres = pres[:m.end()] + lst + pres[m.end():]
+    # Порядок детей CT_Presentation по схеме OOXML: ... sldIdLst, sldSz, notesSz,
+    # embeddedFontLst, ... — вставлять СТРОГО после notesSz/sldSz, иначе PowerPoint/
+    # Keynote считают файл повреждённым (LibreOffice это терпит). См. ECMA-376.
+    for pat in (r'<p:notesSz\b[^>]*/>', r'<p:notesSz\b.*?</p:notesSz>',
+                r'<p:sldSz\b[^>]*/>', r'<p:sldSz\b.*?</p:sldSz>'):
+        m = re.search(pat, pres, re.S)
+        if m:
+            pres = pres[:m.end()] + lst + pres[m.end():]
+            break
+    else:
+        # запасной вариант: перед defaultTextStyle, иначе перед закрытием presentation
+        m = re.search(r'<p:defaultTextStyle\b', pres) or re.search(r'</p:presentation>', pres)
+        pres = pres[:m.start()] + lst + pres[m.start():]
 
     data["[Content_Types].xml"] = ct.encode()
     data["ppt/_rels/presentation.xml.rels"] = rels.encode()
