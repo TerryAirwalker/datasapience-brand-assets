@@ -112,21 +112,22 @@ def build_css():
 
 
 def resolve_facename(css_family, css_weight):
-    """(computed fontFamily, fontWeight) HTML -> имя гарнитуры pptx (typeface) + bold-флаг."""
+    """(computed fontFamily, fontWeight) HTML -> имя гарнитуры pptx (typeface) + bold-флаг.
+
+    КЛЮЧЕВОЕ ОГРАНИЧЕНИЕ macOS: Core Text группирует все статические веса под ОДНИМ
+    типографским семейством ('Unbounded', 'Ping LCG'), а отдельные имена весов
+    ('Unbounded ExtraBold/SemiBold/Medium', 'Ping LCG Medium/Light') как самостоятельные
+    семейства НЕ адресуются — PowerPoint/Keynote выбирают в семействе только Regular/Bold.
+    Поэтому надёжно резолвятся лишь два семейства × {Regular, Bold}. Тяжёлые веса (≥600)
+    → Bold, лёгкие/средние → Regular. Это даёт бренд-шрифт вместо системного фолбэка на
+    любой машине с обычными Unbounded + Ping LCG (без переименованных пакетов).
+    """
     w = int(round(float(css_weight)))
     fam = css_family.strip().strip("'\"").split(",")[0].strip().strip("'\"")
     if fam.startswith("Unbounded"):
-        return {400: ("Unbounded", False), 500: ("Unbounded Medium", False),
-                600: ("Unbounded SemiBold", False), 700: ("Unbounded", True),
-                800: ("Unbounded ExtraBold", False)}.get(
-                    min([400, 500, 600, 700, 800], key=lambda x: abs(x - w)),
-                    ("Unbounded", False))
+        return ("Unbounded", w >= 600)      # 600/700/800 → Bold, 400/500 → Regular
     if fam.startswith("Ping"):
-        return {300: ("Ping LCG Light", False), 400: ("Ping LCG", False),
-                500: ("Ping LCG Medium", False), 700: ("Ping LCG", True)}.get(
-                    min([300, 400, 500, 700], key=lambda x: abs(x - w)),
-                    ("Ping LCG", False))
-    # неизвестное семейство — оставляем как есть
+        return ("Ping LCG", w >= 700)        # 700 → Bold, 300/400/500 → Regular
     return (fam, w >= 600)
 
 
