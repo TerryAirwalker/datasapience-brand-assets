@@ -126,7 +126,7 @@ def _load_scrape_render(page, html_path, png_path):
     return blocks
 
 
-def build(html_files, out_pptx):
+def build(html_files, out_pptx, embed=True):
     from playwright.sync_api import sync_playwright
     from pptx import Presentation
     from pptx.util import Emu, Pt
@@ -203,9 +203,12 @@ def build(html_files, out_pptx):
                         srgb.append(a)
         browser.close()
 
-    raw = os.path.join(tmp, "raw.pptx")
-    prs.save(raw)
-    ds_fonts.embed_fonts(raw, out_pptx)
+    if embed:
+        raw = os.path.join(tmp, "raw.pptx")
+        prs.save(raw)
+        ds_fonts.embed_fonts(raw, out_pptx)
+    else:
+        prs.save(out_pptx)
     return out_pptx
 
 
@@ -214,11 +217,13 @@ def main():
     out = "deck.pptx"
     if "-o" in args:
         i = args.index("-o"); out = args[i + 1]; args = args[:i] + args[i + 2:]
+    embed = "--no-embed" not in args
+    args = [a for a in args if a != "--no-embed"]
     htmls = [a for a in args if a.lower().endswith((".html", ".htm"))]
     if not htmls:
         sys.exit(__doc__)
-    build(htmls, out)
-    print("saved (fonts embedded):", out)
+    build(htmls, out, embed=embed)
+    print("saved" + (" (fonts embedded)" if embed else " (no embed — рассчитан на установленные шрифты)") + ":", out)
 
 
 if __name__ == "__main__":
