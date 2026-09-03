@@ -43,6 +43,11 @@ def F(fname):
 
 # typeface(pptx) -> {"reg": ttf_path, "bold": ttf_path|None, "css": [(weight,int, path)]}
 # css: какие CSS font-weight должны резолвиться в это семейство при рендере HTML.
+# ВАЖНО: PowerPoint/Keynote на macOS honor'ят встроенное семейство ТОЛЬКО если оно
+# укомплектовано И regular, И bold-слотом. Однослотовые (только regular) семейства
+# игнорируются → системный фолбэк. Поэтому у КАЖДОГО семейства заполнены оба слота
+# (для одновесных — тем же файлом), а каждый вес живёт в отдельном семействе с точным
+# именем начертания (typeface = run.font.name = css @font-face family).
 FACES = [
     # --- Unbounded (заголовки/акценты) ---
     ("Unbounded", {
@@ -50,15 +55,15 @@ FACES = [
         "css": [(400, F("Unbounded-Regular.ttf")), (700, F("Unbounded-Bold.ttf"))],
     }),
     ("Unbounded Medium", {
-        "reg": F("Unbounded-Medium.ttf"), "bold": None,
+        "reg": F("Unbounded-Medium.ttf"), "bold": F("Unbounded-Medium.ttf"),
         "css": [(500, F("Unbounded-Medium.ttf"))],
     }),
     ("Unbounded SemiBold", {
-        "reg": F("Unbounded-SemiBold.ttf"), "bold": None,
+        "reg": F("Unbounded-SemiBold.ttf"), "bold": F("Unbounded-SemiBold.ttf"),
         "css": [(600, F("Unbounded-SemiBold.ttf"))],
     }),
     ("Unbounded ExtraBold", {
-        "reg": F("Unbounded-ExtraBold.ttf"), "bold": None,
+        "reg": F("Unbounded-ExtraBold.ttf"), "bold": F("Unbounded-ExtraBold.ttf"),
         "css": [(800, F("Unbounded-ExtraBold.ttf"))],
     }),
     # --- Ping LCG (основной текст) ---
@@ -67,11 +72,11 @@ FACES = [
         "css": [(400, F("PingLCG-Regular.ttf")), (700, F("PingLCG-Bold.ttf"))],
     }),
     ("Ping LCG Medium", {
-        "reg": F("PingLCG-Medium.ttf"), "bold": None,
+        "reg": F("PingLCG-Medium.ttf"), "bold": F("PingLCG-Medium.ttf"),
         "css": [(500, F("PingLCG-Medium.ttf"))],
     }),
     ("Ping LCG Light", {
-        "reg": F("PingLCG-Light.ttf"), "bold": None,
+        "reg": F("PingLCG-Light.ttf"), "bold": F("PingLCG-Light.ttf"),
         "css": [(300, F("PingLCG-Light.ttf"))],
     }),
 ]
