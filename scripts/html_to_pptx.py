@@ -28,7 +28,10 @@ W, H = 1920, 1080
 EMU = 6350           # 12192000 / 1920  (canvas 12192000×6858000 EMU = 13.333×7.5in)
 PX_TO_PT = 0.5       # 1920px = 1057pt  → pt = px/2
 
-# JS: снять все .t блоки — bbox + стиль блока + per-run стили дочерних узлов.
+# JS: снять все .t блоки — bbox + стиль + per-run стили + РЕАЛЬНЫЕ визуальные переносы.
+# Ключ к детерминизму: авто-перенос браузера снимается через Range.getClientRects()
+# и превращается в жёсткие переносы (br). В pptx перенос выключается совсем → PP не
+# переливает текст по своим метрикам, строки встают ровно как в HTML.
 SCRAPE_JS = r"""
 () => {
   const px = v => parseFloat(v) || 0;
@@ -41,26 +44,44 @@ SCRAPE_JS = r"""
     const transform = cs.textTransform;
     const applyTr = t => transform === 'uppercase' ? t.toUpperCase()
                         : transform === 'lowercase' ? t.toLowerCase() : t;
-    // Собираем runs из дочерних узлов; текстовые узлы наследуют стиль блока,
-    // элементные <span> — берут свой computed style (цвет/вес/семейство).
-    const pushRun = (text, styleEl) => {
-      if (!text) return;
-      const s = styleEl ? getComputedStyle(styleEl) : cs;
-      runs.push({
-        text: applyTr(text),
-        family: s.fontFamily, weight: s.fontWeight, style: s.fontStyle,
-        color: s.color, size: px(s.fontSize),
-        letter: s.letterSpacing === 'normal' ? 0 : px(s.letterSpacing),
-      });
+    const mkRun = (text, s) => ({
+      text: applyTr(text),
+      family: s.fontFamily, weight: s.fontWeight, style: s.fontStyle,
+      color: s.color, size: px(s.fontSize),
+      letter: s.letterSpacing === 'normal' ? 0 : px(s.letterSpacing),
+    });
+    // Текстовый узел: разбиваем на слова, по Range определяем визуальные строки,
+    // на каждом переходе на новую строку вставляем br и срезаем перенос-пробел.
+    const pushTextNode = (node, s) => {
+      const val = node.nodeValue;
+      if (!val) return;
+      const toks = val.match(/\S+|\s+/g) || [];
+      const range = document.createRange();
+      let posn = 0, lineTop = null, cur = '';
+      const flush = () => { if (cur) { runs.push(mkRun(cur, s)); cur = ''; } };
+      for (const tok of toks) {
+        const start = posn, end = posn + tok.length; posn = end;
+        if (/^\s+$/.test(tok)) { cur += tok; continue; }
+        range.setStart(node, start); range.setEnd(node, end);
+        const rects = range.getClientRects();
+        const top = rects.length ? Math.round(rects[0].top) : lineTop;
+        if (lineTop === null) lineTop = top;
+        else if (top > lineTop + 3) {           // ушли на следующую строку
+          cur = cur.replace(/\s+$/, ''); flush();
+          runs.push({br: true});
+          lineTop = top;
+        }
+        cur += tok;
+      }
+      flush();
     };
     const walk = (node, styleEl) => {
+      const s = styleEl ? getComputedStyle(styleEl) : cs;
       for (const ch of node.childNodes) {
-        if (ch.nodeType === 3) pushRun(ch.nodeValue, styleEl);
+        if (ch.nodeType === 3) pushTextNode(ch, s);
         else if (ch.nodeType === 1) {
           if (ch.tagName === 'BR') { runs.push({br: true}); continue; }
-          // если у элемента только текст — один run с его стилем; иначе рекурсия
-          if ([...ch.childNodes].every(x => x.nodeType === 3)) pushRun(ch.textContent, ch);
-          else walk(ch, ch);
+          walk(ch, ch);                          // рекурсия со стилем самого узла
         }
       }
     };
@@ -70,7 +91,6 @@ SCRAPE_JS = r"""
     const isBlank = rn => !rn.br && !rn.text.trim();
     while (runs.length && isBlank(runs[0])) runs.shift();
     while (runs.length && isBlank(runs[runs.length-1])) runs.pop();
-    // убрать пробел в начале/конце каждой визуальной строки (вокруг br)
     for (let i = 0; i < runs.length; i++) {
       if (runs[i].br) continue;
       const prevBr = i === 0 || runs[i-1].br;
@@ -82,7 +102,6 @@ SCRAPE_JS = r"""
     out.push({
       x: r.x, y: r.y, w: r.width, h: r.height,
       align: cs.textAlign, valign: el.dataset.valign || 'top',
-      nowrap: el.hasAttribute('data-nowrap'),
       size: px(cs.fontSize), lh: lh, lhr: lh / (px(cs.fontSize) || 1),
       runs,
     });
@@ -162,20 +181,35 @@ def build(html_files, out_pptx, embed=True):
             for b in blocks:
                 if not b["runs"]:
                     continue
-                pad = 0.06 if b["nowrap"] else 0.0     # запас ширины под метрики PP
+                # Переносы уже сняты как жёсткие (br) → строки встают как в HTML. Автоперенос
+                # НЕ выключаем: он работает страховкой — если PP-метрики шире Chromium и
+                # строка не влезает в габарит, она мягко перенесётся, а не уедет за край слайда.
+                # Бокс растим с запасом по ширине (чтобы совпавшие строки не рвались раньше)
+                # и якорим по выравниванию (влево / симметрично / вправо).
+                pad = b["w"] * 0.08 + 12                 # запас ширины в px под метрики PP
+                al = b["align"]
+                if al in ("right", "end"):
+                    bx = b["x"] - pad
+                elif al == "center":
+                    bx = b["x"] - pad / 2
+                else:
+                    bx = b["x"]
                 box = slide.shapes.add_textbox(
-                    Emu(int(b["x"] * EMU)), Emu(int(b["y"] * EMU)),
-                    Emu(int(b["w"] * (1 + pad) * EMU)), Emu(int(b["h"] * EMU)))
+                    Emu(int(bx * EMU)), Emu(int(b["y"] * EMU)),
+                    Emu(int((b["w"] + pad) * EMU)), Emu(int(b["h"] * EMU)))
                 tf = box.text_frame
-                tf.word_wrap = not b["nowrap"]
+                tf.word_wrap = True          # страховка от вылета за габарит; переносы уже жёсткие
                 tf.auto_size = MSO_AUTO_SIZE.NONE
                 tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
                 tf.vertical_anchor = ANCHOR.get(b["valign"], MSO_ANCHOR.TOP)
+                line_pt = Pt(round(b["lh"] * PX_TO_PT, 1)) if b["lh"] else None
                 def new_para():
                     par = tf.paragraphs[0] if not tf.paragraphs[0].runs else tf.add_paragraph()
                     par.alignment = ALIGN.get(b["align"], PP_ALIGN.LEFT)
-                    if b["lhr"]:
-                        par.line_spacing = round(b["lhr"], 3)
+                    par.space_before = Pt(0)
+                    par.space_after = Pt(0)
+                    if line_pt is not None:
+                        par.line_spacing = line_pt          # точный интерлиньяж = CSS line-height
                     return par
                 p = new_para()
                 for rn in b["runs"]:
