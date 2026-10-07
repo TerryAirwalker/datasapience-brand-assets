@@ -5,7 +5,7 @@
 
 ## Структура
 - `logos/svg/` — логотип DS (full/symbol/text, ч/б); `logos/png/variants/` — 12 PNG: horizontal/stacked/side/symbol × black/blue/white (полный набор версий)
-- `logos/products/` — исходники логотипов продуктов (svg/ai/zip); `logos/products/png/` — готовые превью (cm-ocean, kolmogorov, talys, data-ocean-governance)
+- `logos/products/` — исходники логотипов продуктов (svg/ai/zip); `logos/products/png/` — готовые превью (cm-ocean, kolmogorov, talys, data-ocean-governance, `data-ocean/` — Nova/Flex Loader/SDI, `industrial-ocean/` — Industrial Ocean); `logos/products/svg/industrial-ocean/` — SVG Industrial Ocean (horizontal/vertical/icon/text × color/white/black, исходные цвета продукта — не перекрашивать)
 - `fonts/` — Unbounded, Ping LCG
 - `templates/` — Data Sapience template.pptx
 - `icons/` — превью (светлая/тёмная) + icons-png-800.zip (340 PNG)
