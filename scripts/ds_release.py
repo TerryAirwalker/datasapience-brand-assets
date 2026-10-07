@@ -8,7 +8,7 @@
     python3 ds_release.py 2.7                 # проштамповать + опубликовать + тег
     python3 ds_release.py 2.7 --no-publish     # только локально проставить версию
     python3 ds_release.py 2.7 --date 18.06.2026
-    python3 ds_release.py --files-only brandbook [manifest] [skill]
+    python3 ds_release.py --files-only brandbook [manifest] [skill] [helpers]
         # опубликовать уже отредактированные локальные файлы напрямую, БЕЗ бампа версии
         # и БЕЗ тега (случай «правок много, но версия не меняется» — см. SKILL.md брендбука,
         # раздел «Публикация» → «Оставить текущую»).
@@ -16,32 +16,32 @@
 Источник правды версии — manifest.meta.version. Брендбук показывает v<major> · сборку.
 
 Рабочие файлы (MANIFEST/BRANDBOOK) лежат в приватном репозитории-источнике
-datasapience-brandbook-source, клонированном в /workspace/datasapience-brandbook-source/
+datasapience-brandbook-source, клонированном в /workspace/Брендбуки/DataSapience/datasapience-brandbook-source/
 (см. SKILL брендбука, раздел «При запуске») — не в плоском /workspace/, чтобы не терять
 правки между тредами.
 
 ВАЖНО (архитектура managed skills): ~/.claude/skills/datasapience-design/SKILL.md
 физически read-only — Chat App материализует managed-скиллы в сессию только на чтение.
-Поэтому SKILL здесь указывает на staging-копию в /workspace/datasapience-design/SKILL.md
-(конвенция skill_save: скопировать ~/.claude/skills/<name> -> /workspace/<name>, править,
+Поэтому SKILL здесь указывает на staging-копию в /workspace/Брендбуки/DataSapience/skills/datasapience-design/SKILL.md
+(конвенция skill_save: скопировать ~/.claude/skills/<name> -> /workspace/Брендбуки/DataSapience/skills/<name>, править,
 зазипить, вызвать mcp__chatapp_provided_mcp_tools__skill_save). Этот скрипт публикует
 staging-копию в оба репо через API, но НЕ обновляет установленный в сессии managed-скилл —
 это отдельный шаг, который должен сделать агент (zip + skill_save) после запуска релиза.
 """
 import sys, os, json, re, base64, urllib.request, urllib.error, time, datetime
 
-SOURCE_DIR = "/workspace/datasapience-brandbook-source"
+SOURCE_DIR = "/workspace/Брендбуки/DataSapience/datasapience-brandbook-source"
 MANIFEST  = f"{SOURCE_DIR}/manifest.json"
 BRANDBOOK = f"{SOURCE_DIR}/Брендбук Data Sapience v1.html"
-SKILL     = "/workspace/datasapience-design/SKILL.md"
+SKILL     = "/workspace/Брендбуки/DataSapience/skills/datasapience-design/SKILL.md"
 SETTINGS  = "/home/sandbox/.claude/settings.json"
 GH_TOKEN_FILE = "/workspace/.gh_token"  # durable fallback (workspace-диск переживает рестарт рантайма)
 
 # Хелперы самопроверки — публикуются в репо ассетов (scripts/), чтобы быть durable.
 HELPERS = {
-    "blob_check.py": "/workspace/blob_check.py",   # автопроверка отрисовки блобов
-    "ru_typo.py":    "/workspace/ru_typo.py",      # висячие предлоги (неразрывные пробелы)
-    "ds_release.py": "/workspace/ds_release.py",   # сам этот релиз-тул (самопубликация)
+    "blob_check.py": "/workspace/Брендбуки/DataSapience/blob_check.py",   # автопроверка отрисовки блобов
+    "ru_typo.py":    "/workspace/Брендбуки/DataSapience/ru_typo.py",      # висячие предлоги (неразрывные пробелы)
+    "ds_release.py": "/workspace/Брендбуки/DataSapience/ds_release.py",   # сам этот релиз-тул (самопубликация)
 }
 
 def parse_args():
@@ -156,6 +156,7 @@ FILE_ALIASES = {
     "manifest":  [("datasapience-brandbook", "manifest.json", MANIFEST)],
     "skill":     [("datasapience-brandbook", "skill/datasapience-design/SKILL.md", SKILL),
                   ("datasapience-brand-assets", "skill/datasapience-design/SKILL.md", SKILL)],
+    "helpers":   [("datasapience-brand-assets", f"scripts/{n}", p) for n, p in HELPERS.items()],
 }
 
 def files_only(names):
