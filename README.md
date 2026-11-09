@@ -11,7 +11,7 @@
 - `icons/` — превью (светлая/тёмная) + icons-png-800.zip (340 PNG)
 - `patterns/{png,eps,ai}` — 12 паттернов (Blob/Glow 01–03, Filled 04–06, Outline 07–09, Ribbon 10–12)
 - `gradients/{png,eps,ai}` — 3 градиента
-- `graphics/` — 3D-элементы (кольцо, объёмный знак, шестиугольник) и `hexagon.svg` — фирменная форма блоба
+- `graphics/` — 3D-элементы (кольцо, объёмный знак, шестиугольник) и `hexagon.svg` — фирменная форма блоба; `graphics/architecture/ds-architecture.png|pdf` — схема продуктов «Архитектура решений Data Sapience» (готовая, вставлять как есть)
 - `backgrounds/` — эталонные фоны слайдов
 - `examples/` — эталон качества `CVM-эталон.pptx`
 - `scripts/` — хелперы агента: `blob_check.py` (проверка блобов), `ru_typo.py` (неразрывные пробелы), `html_to_pptx.py` + `ds_fonts.py` (редактируемая .pptx), `ds_release.py` (релиз брендбука)
